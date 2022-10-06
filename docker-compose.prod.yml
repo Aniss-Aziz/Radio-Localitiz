@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0.21
+    restart: always
+    container_name: ${PROJECT_NAME}-db
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_USER}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    volumes:
+      - ./data-prod/db_backoffice:/var/lib/mysql
+
+  app:
+    container_name: ${PROJECT_NAME}-app
+    image: ${PROJECT_NAME}-app:latest
+    user: root
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    volumes:
+      - ./data-prod/web:/vol/web
+      - ./app:/app
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: 0
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_USER}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      SENTRY: ${SENTRY}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      SERVER_EMAIL: ${SERVER_EMAIL}
+      ENCRYPT_KEYS: ${ENCRYPT_KEYS}
+    depends_on:
+      - db
+    ports:
+      - "8001:8001"
+
+
+  proxy:
+    container_name: ${PROJECT_NAME}-proxy
+    image: ${PROJECT_NAME}-proxy:latest
+    build:
+      context: ./proxy/
+    restart: always
+    depends_on:
+      - app
+    ports:
+      - "8081:8001"
+    volumes:
+      - ./data-prod/web:/vol/web
